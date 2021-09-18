@@ -4,8 +4,19 @@
 
 package io.flutter.plugins.webviewflutter;
 
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import android.webkit.ValueCallback;
+
+import io.flutter.app.FlutterApplication;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
+import io.flutter.plugin.common.PluginRegistry;
+import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /**
  * Java platform implementation of the webview_flutter plugin.
@@ -18,6 +29,9 @@ import io.flutter.plugin.common.BinaryMessenger;
 public class WebViewFlutterPlugin implements FlutterPlugin {
 
   private FlutterCookieManager flutterCookieManager;
+
+  private WebViewFileUploader fileUploader;
+  public static Activity activity;
 
   /**
    * Add an instance of this to {@link io.flutter.embedding.engine.plugins.PluginRegistry} to
@@ -40,15 +54,15 @@ public class WebViewFlutterPlugin implements FlutterPlugin {
    * <p>Calling this automatically initializes the plugin. However plugins initialized this way
    * won't react to changes in activity or context, unlike {@link CameraPlugin}.
    */
-  @SuppressWarnings("deprecation")
-  public static void registerWith(io.flutter.plugin.common.PluginRegistry.Registrar registrar) {
-    registrar
-        .platformViewRegistry()
-        .registerViewFactory(
-            "plugins.flutter.io/webview",
-            new FlutterWebViewFactory(registrar.messenger(), registrar.view()));
-    new FlutterCookieManager(registrar.messenger());
-  }
+//  @SuppressWarnings("deprecation")
+//  public static void registerWith(io.flutter.plugin.common.PluginRegistry.Registrar registrar) {
+//    registrar
+//        .platformViewRegistry()
+//        .registerViewFactory(
+//            "plugins.flutter.io/webview",
+//            new FlutterWebViewFactory(registrar.messenger(), registrar.view()));
+//    new FlutterCookieManager(registrar.messenger());
+//  }
 
   @Override
   public void onAttachedToEngine(FlutterPluginBinding binding) {
@@ -57,7 +71,7 @@ public class WebViewFlutterPlugin implements FlutterPlugin {
         .getPlatformViewRegistry()
         .registerViewFactory(
             "plugins.flutter.io/webview",
-            new FlutterWebViewFactory(messenger, /*containerView=*/ null));
+            new FlutterWebViewFactory(messenger, /*containerView=*/ null, this));
     flutterCookieManager = new FlutterCookieManager(messenger);
   }
 
@@ -66,8 +80,43 @@ public class WebViewFlutterPlugin implements FlutterPlugin {
     if (flutterCookieManager == null) {
       return;
     }
-
+    activity = null;
     flutterCookieManager.dispose();
     flutterCookieManager = null;
+  }
+
+  @Override
+  public void onAttachedToActivity(ActivityPluginBinding binding) {
+    activity = binding.getActivity();
+    binding.addActivityResultListener(this);
+  }
+
+  @Override
+  public void onDetachedFromActivityForConfigChanges() {
+
+  }
+
+  @Override
+  public void onReattachedToActivityForConfigChanges(ActivityPluginBinding binding) {
+    binding.removeActivityResultListener(this);
+  }
+
+  @Override
+  public void onDetachedFromActivity() {
+
+  }
+
+  @Override
+  public boolean onShowFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType) {
+    if (fileUploader == null) fileUploader = new WebViewFileUploader(activity);
+    fileUploader.start(filePathCallback, acceptType);
+    return true;
+  }
+
+  @Override
+  public boolean onActivityResult(int requestCode, int resultCode, Intent data) {
+    if (fileUploader != null)
+      return fileUploader.onActivityResult(requestCode, resultCode, data);
+    return false;
   }
 }

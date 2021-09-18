@@ -17,10 +17,14 @@ public final class FlutterWebViewFactory extends PlatformViewFactory {
   private final BinaryMessenger messenger;
   private final View containerView;
 
-  FlutterWebViewFactory(BinaryMessenger messenger, View containerView) {
+  private final FlutterWebView.OnShowFileChooserListener onShowFileChooserListener;
+
+  FlutterWebViewFactory(BinaryMessenger messenger, View containerView, FlutterWebView.OnShowFileChooserListener onShowFileChooserListener) {
     super(StandardMessageCodec.INSTANCE);
     this.messenger = messenger;
     this.containerView = containerView;
+
+    this.onShowFileChooserListener = onShowFileChooserListener;
   }
 
   @SuppressWarnings("unchecked")
@@ -28,6 +32,6 @@ public final class FlutterWebViewFactory extends PlatformViewFactory {
   public PlatformView create(Context context, int id, Object args) {
     Map<String, Object> params = (Map<String, Object>) args;
     MethodChannel methodChannel = new MethodChannel(messenger, "plugins.flutter.io/webview_" + id);
-    return new FlutterWebView(context, methodChannel, params, containerView);
+    return new FlutterWebView(context, methodChannel, params, containerView, onShowFileChooserListener);
   }
 }

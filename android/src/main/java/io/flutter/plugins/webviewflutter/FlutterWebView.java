@@ -5,12 +5,18 @@
 package io.flutter.plugins.webviewflutter;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
+import android.content.ClipData;
+import android.content.Intent;
 import android.content.Context;
 import android.hardware.display.DisplayManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.MediaStore;
 import android.view.View;
+import android.webkit.ValueCallback;
 import android.webkit.DownloadListener;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -20,6 +26,7 @@ import android.webkit.WebViewClient;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.annotation.RequiresApi;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -31,11 +38,18 @@ import java.util.Map;
 
 public class FlutterWebView implements PlatformView, MethodCallHandler {
 
+  // 文件选择监听声明
+  interface OnShowFileChooserListener {
+    boolean onShowFileChooser(ValueCallback<Uri[]> filePathCallback, String acceptType);
+  }
+
   private static final String JS_CHANNEL_NAMES_FIELD = "javascriptChannelNames";
   private final WebView webView;
   private final MethodChannel methodChannel;
   private final FlutterWebViewClient flutterWebViewClient;
   private final Handler platformThreadHandler;
+  // 声明监听器对象
+  private OnShowFileChooserListener onShowFileChooserListener;
 
   // Verifies that a url opened by `Window.open` has a secure url.
   private class FlutterWebChromeClient extends WebChromeClient {
@@ -81,6 +95,16 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
     public void onProgressChanged(WebView view, int progress) {
       flutterWebViewClient.onLoadingProgress(progress);
     }
+
+    // 重写文件选择函数
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @Override
+    public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+      String[] acceptTypes = fileChooserParams.getAcceptTypes();
+      if (acceptTypes != null && acceptTypes.length > 0 && onShowFileChooserListener != null)
+        return onShowFileChooserListener.onShowFileChooser(filePathCallback, acceptTypes[0]);
+      return super.onShowFileChooser(webView, filePathCallback, fileChooserParams);
+    }
   }
 
   @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
@@ -89,7 +113,12 @@ public class FlutterWebView implements PlatformView, MethodCallHandler {
       final Context context,
       MethodChannel methodChannel,
       Map<String, Object> params,
-      View containerView) {
+      View containerView,
+      // 传入文件选择监听器对象
+      OnShowFileChooserListener onShowFileChooserListener) {
+
+    // 监听器对象赋值
+    this.onShowFileChooserListener = onShowFileChooserListener;
 
     DisplayListenerProxy displayListenerProxy = new DisplayListenerProxy();
     DisplayManager displayManager =
